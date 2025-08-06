@@ -1,5 +1,8 @@
 import React from "react";
 import { useAuth } from "../contexts/AuthContext";
+import AddBook from "./AddBook";
+import BookManager from "./BookManager";
+import BookSearch from "./BookSearch";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -213,6 +216,15 @@ const Dashboard = () => {
                 </ul>
               </div>
             )}
+            {user?.role === "admin" && (
+              <div style={{ marginTop: "40px" }}>
+                <AddBook />
+                <BookManager />
+              </div>
+            )}
+            <div style={{ marginTop: "40px" }}>
+              <BookSearch />
+            </div>
           </div>
         </div>
       </div>
