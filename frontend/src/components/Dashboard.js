@@ -3,6 +3,8 @@ import { useAuth } from "../contexts/AuthContext";
 import AddBook from "./AddBook";
 import BookManager from "./BookManager";
 import BookSearch from "./BookSearch";
+import UserDashboard from "./UserDashboard";
+import BorrowManagement from "./BorrowManagement";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -216,12 +218,27 @@ const Dashboard = () => {
                 </ul>
               </div>
             )}
+            {/* User Dashboard - All users can see their borrowing history */}
+            <div style={{ marginTop: "40px" }}>
+              <UserDashboard />
+            </div>
+
+            {/* Admin/Staff Features */}
+            {(user?.role === "admin" || user?.role === "staff") && (
+              <div style={{ marginTop: "40px" }}>
+                <BorrowManagement />
+              </div>
+            )}
+
+            {/* Admin Only Features */}
             {user?.role === "admin" && (
               <div style={{ marginTop: "40px" }}>
                 <AddBook />
                 <BookManager />
               </div>
             )}
+
+            {/* Book Search - Available to all */}
             <div style={{ marginTop: "40px" }}>
               <BookSearch />
             </div>

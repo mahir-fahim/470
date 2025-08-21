@@ -1,8 +1,17 @@
 import React, { useState } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
-import Dashboard from "./components/Dashboard";
+import Layout from "./components/Layout";
+import MyLibraryPage from "./pages/MyLibraryPage";
+import BorrowingManagementPage from "./pages/BorrowingManagementPage";
+import AddBookPage from "./pages/AddBookPage";
 
 function App() {
   const { user, loading } = useAuth();
@@ -35,9 +44,26 @@ function App() {
     );
   }
 
-  // If user is authenticated, show dashboard
+  // If user is authenticated, show routed app
   if (user) {
-    return <Dashboard />;
+    return (
+      <Router>
+        <Layout>
+          <Routes>
+            <Route path="/library" element={<MyLibraryPage />} />
+            {(user.role === "admin" || user.role === "staff") && (
+              <>
+                <Route path="/borrow" element={<BorrowingManagementPage />} />
+              </>
+            )}
+            {user.role === "admin" && (
+              <Route path="/books/new" element={<AddBookPage />} />
+            )}
+            <Route path="*" element={<Navigate to="/library" replace />} />
+          </Routes>
+        </Layout>
+      </Router>
+    );
   }
 
   // Show authentication forms

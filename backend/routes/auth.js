@@ -1,15 +1,9 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
-const { body, validationResult } = require("express-validator");
-const User = require("../models/User");
-const { authenticateToken } = require("../middleware/auth");
+const { body } = require("express-validator");
+const { authenticateToken, requireRole } = require("../middleware/auth");
+const authController = require("../controllers/authController");
 
 const router = express.Router();
-
-// Generate JWT token
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "24h" });
-};
 
 // @route   POST /api/auth/signup
 // @desc    Register a new user
@@ -35,64 +29,7 @@ router.post(
       .isIn(["user", "staff", "admin"])
       .withMessage("Invalid role"),
   ],
-  async (req, res) => {
-    try {
-      // Check for validation errors
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          message: "Validation failed",
-          errors: errors.array(),
-        });
-      }
-
-      const {
-        username,
-        email,
-        password,
-        firstName,
-        lastName,
-        phoneNumber,
-        role = "user",
-      } = req.body;
-
-      // Check if user already exists
-      const existingUser = await User.findOne({
-        $or: [{ email }, { username }],
-      });
-
-      if (existingUser) {
-        return res.status(400).json({
-          message: "User with this email or username already exists",
-        });
-      }
-
-      // Create new user
-      const user = new User({
-        username,
-        email,
-        password,
-        firstName,
-        lastName,
-        phoneNumber,
-        role,
-      });
-
-      await user.save();
-
-      // Generate token
-      const token = generateToken(user._id);
-
-      res.status(201).json({
-        message: "User registered successfully",
-        token,
-        user: user.toJSON(),
-      });
-    } catch (error) {
-      console.error("Signup error:", error);
-      res.status(500).json({ message: "Server error during registration" });
-    }
-  }
+  authController.signup
 );
 
 // @route   POST /api/auth/login
@@ -104,72 +41,18 @@ router.post(
     body("email").isEmail().withMessage("Please enter a valid email"),
     body("password").notEmpty().withMessage("Password is required"),
   ],
-  async (req, res) => {
-    try {
-      // Check for validation errors
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          message: "Validation failed",
-          errors: errors.array(),
-        });
-      }
-
-      const { email, password } = req.body;
-
-      // Find user by email
-      const user = await User.findOne({ email });
-      if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      // Check if account is active
-      if (!user.isActive) {
-        return res.status(401).json({ message: "Account is deactivated" });
-      }
-
-      // Verify password
-      const isPasswordValid = await user.comparePassword(password);
-      if (!isPasswordValid) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      // Update last login
-      user.lastLogin = new Date();
-      await user.save();
-
-      // Generate token
-      const token = generateToken(user._id);
-
-      res.json({
-        message: "Login successful",
-        token,
-        user: user.toJSON(),
-      });
-    } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ message: "Server error during login" });
-    }
-  }
+  authController.login
 );
 
 // @route   POST /api/auth/logout
 // @desc    Logout user (client-side token removal)
 // @access  Private
-router.post("/logout", authenticateToken, (req, res) => {
-  // In a stateless JWT system, logout is handled client-side
-  // by removing the token from storage
-  res.json({ message: "Logged out successfully" });
-});
+router.post("/logout", authenticateToken, authController.logout);
 
 // @route   GET /api/auth/profile
 // @desc    Get user profile
 // @access  Private
-router.get("/profile", authenticateToken, (req, res) => {
-  res.json({
-    user: req.user,
-  });
-});
+router.get("/profile", authenticateToken, authController.getProfile);
 
 // @route   PUT /api/auth/profile
 // @desc    Update user profile
@@ -191,39 +74,7 @@ router.put(
       .isMobilePhone()
       .withMessage("Please enter a valid phone number"),
   ],
-  async (req, res) => {
-    try {
-      // Check for validation errors
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          message: "Validation failed",
-          errors: errors.array(),
-        });
-      }
-
-      const { firstName, lastName, phoneNumber } = req.body;
-      const updateData = {};
-
-      if (firstName) updateData.firstName = firstName;
-      if (lastName) updateData.lastName = lastName;
-      if (phoneNumber) updateData.phoneNumber = phoneNumber;
-
-      const updatedUser = await User.findByIdAndUpdate(
-        req.user._id,
-        updateData,
-        { new: true, runValidators: true }
-      ).select("-password");
-
-      res.json({
-        message: "Profile updated successfully",
-        user: updatedUser,
-      });
-    } catch (error) {
-      console.error("Profile update error:", error);
-      res.status(500).json({ message: "Server error during profile update" });
-    }
-  }
+  authController.updateProfile
 );
 
 // @route   POST /api/auth/change-password
@@ -240,42 +91,17 @@ router.post(
       .isLength({ min: 6 })
       .withMessage("New password must be at least 6 characters long"),
   ],
-  async (req, res) => {
-    try {
-      // Check for validation errors
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          message: "Validation failed",
-          errors: errors.array(),
-        });
-      }
+  authController.changePassword
+);
 
-      const { currentPassword, newPassword } = req.body;
-
-      // Get user with password
-      const user = await User.findById(req.user._id);
-
-      // Verify current password
-      const isCurrentPasswordValid = await user.comparePassword(
-        currentPassword
-      );
-      if (!isCurrentPasswordValid) {
-        return res
-          .status(400)
-          .json({ message: "Current password is incorrect" });
-      }
-
-      // Update password
-      user.password = newPassword;
-      await user.save();
-
-      res.json({ message: "Password changed successfully" });
-    } catch (error) {
-      console.error("Password change error:", error);
-      res.status(500).json({ message: "Server error during password change" });
-    }
-  }
+// @route   GET /api/auth/users
+// @desc    Get all users (admin/staff only)
+// @access  Private
+router.get(
+  "/users",
+  authenticateToken,
+  requireRole(["admin", "staff"]),
+  authController.getUsers
 );
 
 module.exports = router;

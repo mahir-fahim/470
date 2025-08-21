@@ -4,6 +4,8 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const authRoutes = require("./routes/auth");
 const bookRoutes = require("./routes/books");
+const borrowRoutes = require("./routes/borrow");
+const borrowRequestRoutes = require("./routes/borrowRequest");
 
 // Load environment variables
 dotenv.config();
@@ -14,7 +16,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/api/books", bookRoutes);
 
 // Database connection
 mongoose
@@ -24,6 +25,9 @@ mongoose
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/books", bookRoutes);
+app.use("/api/borrow", borrowRoutes);
+app.use("/api/borrow-requests", borrowRequestRoutes);
 
 // Basic route for testing
 app.get("/", (req, res) => {
