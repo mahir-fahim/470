@@ -6,6 +6,7 @@ const authRoutes = require("./routes/auth");
 const bookRoutes = require("./routes/books");
 const borrowRoutes = require("./routes/borrow");
 const borrowRequestRoutes = require("./routes/borrowRequest");
+const reservationRoutes = require("./routes/reservation");
 
 // Load environment variables
 dotenv.config();
@@ -28,6 +29,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/books", bookRoutes);
 app.use("/api/borrow", borrowRoutes);
 app.use("/api/borrow-requests", borrowRequestRoutes);
+app.use("/api/reservations", reservationRoutes);
 
 // Basic route for testing
 app.get("/", (req, res) => {

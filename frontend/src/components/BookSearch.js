@@ -11,6 +11,8 @@ const BookSearch = () => {
   const [categories, setCategories] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [requesting, setRequesting] = useState("");
+  const [myReservations, setMyReservations] = useState([]);
+  const [reserving, setReserving] = useState("");
 
   useEffect(() => {
     // Fetch all categories from books
@@ -27,7 +29,7 @@ const BookSearch = () => {
   }, []);
 
   useEffect(() => {
-    // Fetch user's borrow requests
+    // Fetch user's borrow requests and reservations
     const fetchRequests = async () => {
       if (!user) return;
       try {
@@ -35,6 +37,12 @@ const BookSearch = () => {
         setMyRequests(res.data.requests);
       } catch (err) {
         setMyRequests([]);
+      }
+      try {
+        const resv = await axios.get("/api/reservations/my");
+        setMyReservations(resv.data.reservations);
+      } catch (err) {
+        setMyReservations([]);
       }
     };
     fetchRequests();
@@ -48,12 +56,25 @@ const BookSearch = () => {
       if (q) params.q = q;
       if (category) params.category = category;
       const res = await axios.get("/api/books/search", { params });
-      // Only show books with copiesAvailable > 0
-      setBooks(res.data.books.filter((b) => b.copiesAvailable > 0));
+      // Show all books, including out-of-stock
+      setBooks(res.data.books);
     } catch (err) {
       setBooks([]);
     }
     setLoading(false);
+  };
+  const handleReserve = async (bookId) => {
+    setReserving(bookId);
+    try {
+      await axios.post("/api/reservations", { bookId });
+      // Refresh reservations
+      const resv = await axios.get("/api/reservations/my");
+      setMyReservations(resv.data.reservations);
+      alert("Reservation submitted!");
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to reserve");
+    }
+    setReserving("");
   };
 
   const handleRequest = async (bookId) => {
@@ -122,6 +143,9 @@ const BookSearch = () => {
                   let req = myRequests.find(
                     (r) => r.book._id === book._id && r.status === "pending"
                   );
+                  let resv = myReservations.find(
+                    (r) => r.book._id === book._id && r.status === "active"
+                  );
                   return (
                     <tr key={book._id}>
                       <td>{book.title}</td>
@@ -131,17 +155,31 @@ const BookSearch = () => {
                       <td>{book.copiesAvailable}</td>
                       {user && user.role === "user" && (
                         <td>
-                          {req ? (
-                            <span style={{ color: "#888" }}>Requested</span>
+                          {book.copiesAvailable > 0 ? (
+                            req ? (
+                              <span style={{ color: "#888" }}>Requested</span>
+                            ) : (
+                              <button
+                                className="btn btn-primary"
+                                disabled={requesting === book._id}
+                                onClick={() => handleRequest(book._id)}
+                              >
+                                {requesting === book._id
+                                  ? "Requesting..."
+                                  : "Request"}
+                              </button>
+                            )
+                          ) : resv ? (
+                            <span style={{ color: "#888" }}>Reserved</span>
                           ) : (
                             <button
-                              className="btn btn-primary"
-                              disabled={requesting === book._id}
-                              onClick={() => handleRequest(book._id)}
+                              className="btn btn-secondary"
+                              disabled={reserving === book._id}
+                              onClick={() => handleReserve(book._id)}
                             >
-                              {requesting === book._id
-                                ? "Requesting..."
-                                : "Request"}
+                              {reserving === book._id
+                                ? "Reserving..."
+                                : "Reserve"}
                             </button>
                           )}
                         </td>

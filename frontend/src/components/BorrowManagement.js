@@ -19,10 +19,52 @@ const BorrowManagement = () => {
     dueDate: "",
     notes: "",
   });
+  // Borrow requests (for admin)
+  const [borrowRequests, setBorrowRequests] = useState([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
+    if (user && user.role === "admin") fetchRequests();
+    // eslint-disable-next-line
   }, []);
+
+  const fetchRequests = async () => {
+    setRequestsLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.get("/api/borrow-requests", { headers });
+      setBorrowRequests(res.data.requests);
+    } catch (err) {
+      setBorrowRequests([]);
+    }
+    setRequestsLoading(false);
+  };
+  const handleApprove = async (id) => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.put(`/api/borrow-requests/${id}/approve`, {}, { headers });
+      toast.success("Request approved");
+      fetchRequests();
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to approve");
+    }
+  };
+
+  const handleReject = async (id) => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.put(`/api/borrow-requests/${id}/reject`, {}, { headers });
+      toast.info("Request rejected");
+      fetchRequests();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to reject");
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -150,9 +192,79 @@ const BorrowManagement = () => {
   return (
     <div className="borrow-management">
       <div className="management-header">
-        <h2>📚 Borrowing Management</h2>
+        <h2>
+          📚 Borrowing Management
+          {user?.role === "admin" &&
+            borrowRequests.filter((r) => r.status === "pending").length > 0 && (
+              <span
+                style={{ marginLeft: 10, color: "#e74c3c", fontSize: 18 }}
+                title="Pending Requests"
+              >
+                ● {borrowRequests.filter((r) => r.status === "pending").length}{" "}
+                pending
+              </span>
+            )}
+        </h2>
         <p>Manage book borrowing operations and track user activity.</p>
       </div>
+
+      {/* Admin: Borrow Requests Table */}
+      {user?.role === "admin" && (
+        <div className="records-section" style={{ marginBottom: 30 }}>
+          <h3>📥 Pending Borrow Requests</h3>
+          {requestsLoading ? (
+            <div>Loading requests...</div>
+          ) : borrowRequests.filter((r) => r.status === "pending").length ===
+            0 ? (
+            <div className="empty-state">No pending requests.</div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Book</th>
+                  <th>Requested At</th>
+                  <th>Notes</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {borrowRequests
+                  .filter((r) => r.status === "pending")
+                  .map((r) => (
+                    <tr key={r._id}>
+                      <td>
+                        {r.user?.firstName} {r.user?.lastName} <br />
+                        <small>{r.user?.email}</small>
+                      </td>
+                      <td>
+                        {r.book?.title} <br />
+                        <small>{r.book?.author}</small>
+                      </td>
+                      <td>{new Date(r.requestedAt).toLocaleString()}</td>
+                      <td>{r.notes || "-"}</td>
+                      <td>
+                        <button
+                          className="btn btn-primary"
+                          style={{ marginRight: 8 }}
+                          onClick={() => handleApprove(r._id)}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleReject(r._id)}
+                        >
+                          Reject
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {/* Statistics Cards */}
       <div className="stats-cards">
